@@ -88,9 +88,12 @@ service cloud.firestore {
         && resource.data.keys().hasAll(['available', 'id', 'ownerUid', 'joinedUid'])
         && roomParticipant(resource.data);
 
+      // ICE candidate docs are ephemeral and live under a collection named
+      // after a random 6-char roomId, so they are not enumerable. Allow any
+      // signed-in user to delete them so EITHER participant (caller or callee)
+      // can fully clean up a room on disconnect without leaving orphans.
       allow delete: if signedIn()
-        && resource.data.keys().hasAll(['candidate', 'sdpMid', 'sdpMLineIndex', 'usernameFragment', 'ownerUid', 'roomOwnerUid'])
-        && candidateParticipant(resource.data);
+        && resource.data.keys().hasAll(['candidate', 'sdpMid', 'sdpMLineIndex', 'usernameFragment', 'ownerUid', 'roomOwnerUid']);
     }
   }
 }

@@ -94,125 +94,135 @@ export default function Home() {
         <StatusPill status={chat.status} channelOpen={chat.channelOpen} />
       </header>
 
-      {/* Stage */}
+      {/* Stage — matches the sketch: left sidebar (local cam + chat), right main (remote) */}
       <main className="relative z-10 min-h-0 flex-1 px-3 pb-3 sm:px-6">
-        <div className="grid h-full min-h-0 grid-rows-[40vh_1fr] gap-3 lg:grid-cols-[1fr_22rem] lg:grid-rows-1 xl:grid-cols-[1fr_26rem]">
-          {/* Remote stage */}
-          <section className="relative min-h-0 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/50 shadow-2xl shadow-black/40 backdrop-blur">
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-            <RemoteOverlay status={chat.status} hasRemote={!!chat.remoteStream} />
-
-            {/* Local PiP */}
-            <div className="absolute bottom-3 left-3 z-20 h-24 w-32 overflow-hidden rounded-xl border border-white/15 bg-zinc-950/80 shadow-lg sm:h-32 sm:w-44">
+        <div className="grid h-full min-h-0 grid-rows-[42vh_1fr] gap-3 lg:grid-cols-[20rem_1fr] lg:grid-rows-1 xl:grid-cols-[24rem_1fr]">
+          {/* Left sidebar: local camera (16:9) on top, chat below */}
+          <aside className="flex min-h-0 flex-col gap-3 order-2 lg:order-1">
+            {/* Local camera — locked to 16:9 */}
+            <div className="relative aspect-video w-full max-w-[260px] shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/70 shadow-lg shadow-black/40 mx-auto lg:max-w-none lg:mx-0">
               <video
                 ref={localVideoRef}
                 autoPlay
                 playsInline
                 muted
-                className="h-full w-full -scale-x-100 object-cover"
+                className="absolute inset-0 h-full w-full -scale-x-100 object-cover"
               />
               {!chat.localStream && (
-                <div className="absolute inset-0 flex items-center justify-center text-zinc-600">
-                  <VideoOff className="size-5" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-600">
+                  <VideoOff className="size-6" />
                 </div>
               )}
-              <span className="absolute left-1.5 top-1.5 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-zinc-200 backdrop-blur">
+              <span className="absolute left-2 top-2 z-10 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-zinc-200 backdrop-blur">
                 You
               </span>
             </div>
-          </section>
 
-          {/* Chat panel */}
-          <aside className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/50 shadow-xl shadow-black/30 backdrop-blur">
-            <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-zinc-200">
-                <MessageCircle className="size-4 text-emerald-400" />
-                Chat
-              </div>
-              <span
-                className={`flex items-center gap-1.5 text-xs ${canChat ? "text-emerald-400" : "text-zinc-500"}`}
-              >
-                <span
-                  className={`size-1.5 rounded-full ${canChat ? "bg-emerald-400" : "bg-zinc-600"}`}
-                />
-                {canChat ? "Live" : "Offline"}
-              </span>
-            </div>
-
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-track]:bg-transparent">
-              {chat.messages.length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-                  <MessageCircle className="mb-2 size-7 text-zinc-700" />
-                  <p className="text-sm text-zinc-500">
-                    {chat.status === "connected"
-                      ? "Say hi to your match 👋"
-                      : "Messages appear here once you’re connected."}
-                  </p>
+            {/* Chat panel */}
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/50 shadow-xl shadow-black/30 backdrop-blur">
+              <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-2.5">
+                <div className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                  <MessageCircle className="size-4 text-emerald-400" />
+                  Chat
                 </div>
-              ) : (
-                chat.messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`flex ${m.from === "me" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[82%] break-words rounded-2xl px-3 py-1.5 text-sm leading-snug shadow-sm ${
-                        m.from === "me"
-                          ? "rounded-br-sm bg-emerald-500/20 text-emerald-50 ring-1 ring-emerald-500/30"
-                          : "rounded-bl-sm bg-zinc-800/90 text-zinc-100 ring-1 ring-white/10"
-                      }`}
-                    >
-                      {m.text}
-                    </div>
-                  </div>
-                ))
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+                <span
+                  className={`flex items-center gap-1.5 text-xs ${canChat ? "text-emerald-400" : "text-zinc-500"}`}
+                >
+                  <span
+                    className={`size-1.5 rounded-full ${canChat ? "bg-emerald-400" : "bg-zinc-600"}`}
+                  />
+                  {canChat ? "Live" : "Offline"}
+                </span>
+              </div>
 
-            {/* Input row — input flexes, send button never overflows */}
-            <div className="flex shrink-0 items-center gap-2 border-t border-white/10 p-3">
-              <Input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder={
-                  canChat ? "Type a message…" : "Connect to start chatting"
-                }
-                disabled={!canChat}
-                className="min-w-0 flex-1 border-white/10 bg-zinc-950/60 text-zinc-100 placeholder:text-zinc-600 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
-              />
-              <Button
-                onClick={onSend}
-                disabled={!canChat || !draft.trim()}
-                size="icon"
-                className="size-10 shrink-0 rounded-xl bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
-                aria-label="Send message"
-              >
-                <Send className="size-4" />
-              </Button>
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-track]:bg-transparent">
+                {chat.messages.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center px-4 text-center">
+                    <MessageCircle className="mb-2 size-6 text-zinc-700" />
+                    <p className="text-xs text-zinc-500">
+                      {chat.status === "connected"
+                        ? "Say hi to your match 👋"
+                        : "Messages appear here once you’re connected."}
+                    </p>
+                  </div>
+                ) : (
+                  chat.messages.map((m) => (
+                    <div
+                      key={m.id}
+                      className={`flex ${m.from === "me" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[85%] break-words rounded-2xl px-3 py-1.5 text-sm leading-snug shadow-sm ${
+                          m.from === "me"
+                            ? "rounded-br-sm bg-emerald-500/20 text-emerald-50 ring-1 ring-emerald-500/30"
+                            : "rounded-bl-sm bg-zinc-800/90 text-zinc-100 ring-1 ring-white/10"
+                        }`}
+                      >
+                        {m.text}
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input row — input flexes, send button never overflows */}
+              <div className="flex shrink-0 items-center gap-2 border-t border-white/10 p-3">
+                <Input
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder={
+                    canChat ? "Type a message…" : "Connect to start chatting"
+                  }
+                  disabled={!canChat}
+                  className="min-w-0 flex-1 border-white/10 bg-zinc-950/60 text-zinc-100 placeholder:text-zinc-600 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
+                />
+                <Button
+                  onClick={onSend}
+                  disabled={!canChat || !draft.trim()}
+                  size="icon"
+                  className="size-9 shrink-0 rounded-xl bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+                  aria-label="Send message"
+                >
+                  <Send className="size-4" />
+                </Button>
+              </div>
             </div>
           </aside>
+
+          {/* Right main: remote video, locked to 16:9 and centered */}
+          <section className="flex min-h-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/50 shadow-2xl shadow-black/40 backdrop-blur order-1 lg:order-2">
+            <div className="relative aspect-video max-h-full w-full max-w-full overflow-hidden rounded-2xl bg-zinc-950/60">
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              <RemoteOverlay
+                status={chat.status}
+                hasRemote={!!chat.remoteStream}
+              />
+            </div>
+          </section>
         </div>
       </main>
 
       {/* Controls (sticky bottom) */}
       <footer className="relative z-10 shrink-0 border-t border-white/10 bg-zinc-950/60 px-4 py-3 backdrop-blur sm:px-6">
-        <div className="mx-auto flex max-w-3xl items-center justify-center gap-3">
+        <div className="mx-auto flex max-w-4xl items-center gap-3">
           {!started ? (
-            <Button
-              onClick={chat.start}
-              size="lg"
-              className="h-12 gap-2 rounded-xl bg-emerald-500 px-8 text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 hover:shadow-emerald-500/30"
-            >
-              <Play className="size-5 fill-current" />
-              Start
-            </Button>
+            <div className="flex w-full justify-center">
+              <Button
+                onClick={chat.start}
+                size="lg"
+                className="h-12 gap-2 rounded-xl bg-emerald-500 px-8 text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 hover:shadow-emerald-500/30"
+              >
+                <Play className="size-5 fill-current" />
+                Start
+              </Button>
+            </div>
           ) : (
             <>
               <Button
@@ -226,7 +236,7 @@ export default function Home() {
               <Button
                 onClick={chat.disconnect}
                 size="lg"
-                className="h-12 gap-2 rounded-xl bg-rose-500/90 px-6 text-base font-semibold text-white shadow-lg shadow-rose-500/20 transition hover:bg-rose-500"
+                className="ml-auto h-12 gap-2 rounded-xl bg-rose-500/90 px-6 text-base font-semibold text-white shadow-lg shadow-rose-500/20 transition hover:bg-rose-500"
               >
                 <PhoneOff className="size-5" />
                 Disconnect
@@ -372,9 +382,7 @@ function RemoteOverlay({
         <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-white/5 text-zinc-500 ring-1 ring-white/10">
           <VideoOff className="size-8" />
         </div>
-        <p className="text-lg font-semibold text-zinc-100">
-          Ready to connect
-        </p>
+        <p className="text-lg font-semibold text-zinc-100">Ready to connect</p>
         <p className="mt-1 text-sm text-zinc-500">
           Press <span className="font-medium text-emerald-400">Start</span> to
           meet someone new.
