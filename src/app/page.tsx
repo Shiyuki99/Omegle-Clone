@@ -10,7 +10,6 @@ import {
   Shuffle,
   Signal,
   UserX,
-  Video,
   VideoOff,
   X,
 } from "lucide-react";
@@ -229,6 +228,25 @@ function DesktopView({ chat }: { chat: ReturnType<typeof useRandomChat> }) {
   const started = chat.status !== "idle";
   const canChat = chat.channelOpen && chat.status === "connected";
 
+  // Global desktop shortcuts: Enter = next, Escape = disconnect.
+  // Ignored while typing in the chat input so Enter can send messages.
+  useEffect(() => {
+    if (!started) return;
+    const handler = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      if (e.key === "Enter") {
+        e.preventDefault();
+        chat.nextPerson();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        chat.disconnect();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [started, chat.nextPerson, chat.disconnect]);
+
   const onSend = () => {
     if (chat.sendMessage(draft)) setDraft("");
   };
@@ -243,11 +261,13 @@ function DesktopView({ chat }: { chat: ReturnType<typeof useRandomChat> }) {
     <div className="relative z-10 hidden h-full min-h-0 lg:flex lg:flex-col">
       <header className="flex shrink-0 items-center justify-between px-6 py-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30">
-            <Video className="size-5" />
-          </div>
+          <img
+            src="/estin-megel-logo.svg"
+            alt="estin-megel"
+            className="size-9 rounded-xl"
+          />
           <div className="leading-tight">
-            <h1 className="text-lg font-semibold tracking-tight">Roulette</h1>
+            <h1 className="text-lg font-semibold tracking-tight">estin-megel</h1>
             <p className="text-xs text-zinc-500">Random video chat</p>
           </div>
         </div>
@@ -359,18 +379,16 @@ function DesktopView({ chat }: { chat: ReturnType<typeof useRandomChat> }) {
       </main>
 
       <footer className="relative z-10 shrink-0 border-t border-white/10 bg-zinc-950/60 px-6 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center gap-3">
+        <div className="mx-auto flex max-w-4xl items-center justify-end gap-3">
           {!started ? (
-            <div className="flex w-full justify-center">
-              <Button
-                onClick={chat.start}
-                size="lg"
-                className="h-12 gap-2 rounded-xl bg-emerald-500 px-8 text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
-              >
-                <Play className="size-5 fill-current" />
-                Start
-              </Button>
-            </div>
+            <Button
+              onClick={chat.start}
+              size="lg"
+              className="h-12 gap-2 rounded-xl bg-emerald-500 px-8 text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+            >
+              <Play className="size-5 fill-current" />
+              Start
+            </Button>
           ) : (
             <>
               <Button
@@ -384,7 +402,7 @@ function DesktopView({ chat }: { chat: ReturnType<typeof useRandomChat> }) {
               <Button
                 onClick={chat.disconnect}
                 size="lg"
-                className="ml-auto h-12 gap-2 rounded-xl bg-rose-500/90 px-6 text-base font-semibold text-white shadow-lg shadow-rose-500/20 transition hover:bg-rose-500"
+                className="h-12 gap-2 rounded-xl bg-rose-500/90 px-6 text-base font-semibold text-white shadow-lg shadow-rose-500/20 transition hover:bg-rose-500"
               >
                 <PhoneOff className="size-5" />
                 Disconnect
@@ -408,6 +426,8 @@ function MobileView({ chat }: { chat: ReturnType<typeof useRandomChat> }) {
   const [draft, setDraft] = useState("");
   const [composing, setComposing] = useState(false);
   const [stopArmed, setStopArmed] = useState(false);
+  const [cover, setCover] = useState(true);
+  const [showHint, setShowHint] = useState(true);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -422,6 +442,12 @@ function MobileView({ chat }: { chat: ReturnType<typeof useRandomChat> }) {
     return () => {
       if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
     };
+  }, []);
+
+  // Brief hint on top of the camera — auto-hide after a few seconds.
+  useEffect(() => {
+    const t = setTimeout(() => setShowHint(false), 5000);
+    return () => clearTimeout(t);
   }, []);
 
   // Reset transient UI (compose open, stop-armed) whenever call state changes.
@@ -474,80 +500,91 @@ function MobileView({ chat }: { chat: ReturnType<typeof useRandomChat> }) {
 
   return (
     <div className="relative z-10 flex h-full min-h-0 flex-col lg:hidden">
-      {/* Remote video stage (fills available space) */}
-      <div className="relative min-h-0 flex-1 overflow-hidden bg-zinc-950">
-        <video
-          ref={remoteVideoRef}
-          autoPlay
-          playsInline
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-
-        {/* Status chip (top-left) */}
+      {/* Remote video stage (fills available space, with a small margin) */}
+      <div className="min-h-0 flex-1 bg-zinc-950 p-2.5">
         <div
-          className={`absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-medium backdrop-blur ${c.text}`}
+          className="relative h-full w-full cursor-pointer overflow-hidden rounded-2xl bg-zinc-950"
+          onClick={() => setCover((v) => !v)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setCover((v) => !v);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label="Toggle video zoom"
         >
-          <span className="relative flex size-1.5">
-            {c.pulse && (
-              <span
-                className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${c.dot}`}
-              />
-            )}
-            <span className={`relative inline-flex size-1.5 rounded-full ${c.dot}`} />
-          </span>
-          {c.label}
-        </div>
-
-        {/* Local camera PiP (top-right, small) */}
-        <div className="absolute right-3 top-3 z-20 w-24 overflow-hidden rounded-xl border border-white/20 bg-zinc-950/80 shadow-lg sm:w-28">
-          <div className="relative aspect-video w-full">
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              className="absolute inset-0 h-full w-full -scale-x-100 object-cover"
-            />
-            {!chat.localStream && (
-              <div className="absolute inset-0 flex items-center justify-center text-zinc-600">
-                <VideoOff className="size-4" />
-              </div>
-            )}
-            <span className="absolute left-1 top-1 rounded bg-black/55 px-1 py-0.5 text-[9px] font-medium text-zinc-200 backdrop-blur">
-              You
-            </span>
-          </div>
-        </div>
-
-        {/* Message bubbles overlay (bottom of video) */}
-        {recentMessages.length > 0 && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex flex-col items-start gap-1.5 px-3">
-            {recentMessages.map((m) => (
-              <div
-                key={m.id}
-                className={`max-w-[80%] break-words rounded-2xl px-2.5 py-1 text-sm leading-snug shadow-md backdrop-blur-sm ${
-                  m.from === "me"
-                    ? "self-end rounded-br-sm bg-emerald-500/30 text-emerald-50 ring-1 ring-emerald-500/40"
-                    : "self-start rounded-bl-sm bg-zinc-900/80 text-zinc-100 ring-1 ring-white/10"
-                }`}
-              >
-                {m.text}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Backdrop to dismiss compose when tapping the video */}
-        {composing && (
-          <button
-            type="button"
-            aria-label="Close keyboard"
-            onClick={closeCompose}
-            className="absolute inset-0 z-30 bg-black/40 backdrop-blur-[1px]"
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className={`absolute inset-0 h-full w-full ${cover ? "object-cover" : "object-contain"}`}
           />
-        )}
 
-        <RemoteOverlay status={chat.status} hasRemote={!!chat.remoteStream} />
+          {/* Brief hint on top of the camera */}
+          {showHint && (
+            <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[11px] font-medium text-zinc-200 backdrop-blur">
+              Tap video to toggle zoom
+            </div>
+          )}
+
+          {/* Status chip (top-left) */}
+          <div
+            className={`absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-medium backdrop-blur ${c.text}`}
+          >
+            <span className="relative flex size-1.5">
+              {c.pulse && (
+                <span
+                  className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${c.dot}`}
+                />
+              )}
+              <span className={`relative inline-flex size-1.5 rounded-full ${c.dot}`} />
+            </span>
+            {c.label}
+          </div>
+
+          {/* Local camera PiP (top-right, small) */}
+          <div className="absolute right-3 top-3 z-20 w-24 overflow-hidden rounded-xl border border-white/20 bg-zinc-950/80 shadow-lg sm:w-28">
+            <div className="relative aspect-video w-full">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="absolute inset-0 h-full w-full -scale-x-100 object-cover"
+              />
+              {!chat.localStream && (
+                <div className="absolute inset-0 flex items-center justify-center text-zinc-600">
+                  <VideoOff className="size-4" />
+                </div>
+              )}
+              <span className="absolute left-1 top-1 rounded bg-black/55 px-1 py-0.5 text-[9px] font-medium text-zinc-200 backdrop-blur">
+                You
+              </span>
+            </div>
+          </div>
+
+          {/* Message bubbles overlay (bottom of video) */}
+          {recentMessages.length > 0 && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex flex-col items-start gap-1.5 px-3">
+              {recentMessages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`max-w-[80%] break-words rounded-2xl px-2.5 py-1 text-sm leading-snug shadow-md backdrop-blur-sm ${
+                    m.from === "me"
+                      ? "self-end rounded-br-sm bg-emerald-500/30 text-emerald-50 ring-1 ring-emerald-500/40"
+                      : "self-start rounded-bl-sm bg-zinc-900/80 text-zinc-100 ring-1 ring-white/10"
+                  }`}
+                >
+                  {m.text}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <RemoteOverlay status={chat.status} hasRemote={!!chat.remoteStream} />
+        </div>
       </div>
 
       {/* Controls (compose bar takes over while typing) */}

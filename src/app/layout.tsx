@@ -14,24 +14,28 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Roulette — Random Video Chat",
-  description: "Meet strangers face-to-face over secure WebRTC. Anonymous, instant, peer-to-peer video chat.",
-  keywords: ["WebRTC", "video chat", "random chat", "roulette", "peer to peer"],
-  authors: [{ name: "Roulette" }],
+  title: "estin-megel",
+  description: "Random video chat — meet strangers face-to-face over WebRTC.",
+  keywords: ["WebRTC", "video chat", "random chat", "estin-megel", "peer to peer"],
+  authors: [{ name: "estin-megel" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: [
+      { url: "/estin-megel-logo.svg", type: "image/svg+xml" },
+      { url: "/estin-megel-logo.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: "/estin-megel-logo.png",
   },
   openGraph: {
-    title: "Roulette — Random Video Chat",
-    description: "Meet strangers face-to-face over secure WebRTC.",
+    title: "estin-megel",
+    description: "Random video chat — meet strangers face-to-face over WebRTC.",
     url: "https://chat.z.ai",
-    siteName: "Roulette",
+    siteName: "estin-megel",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Roulette — Random Video Chat",
-    description: "Meet strangers face-to-face over secure WebRTC.",
+    title: "estin-megel",
+    description: "Random video chat — meet strangers face-to-face over WebRTC.",
   },
 };
 

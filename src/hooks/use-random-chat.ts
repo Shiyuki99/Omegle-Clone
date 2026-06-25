@@ -644,14 +644,8 @@ export function useRandomChat() {
       console.warn("start failed:", err?.code || err?.message || err);
       hangUp({ keepCamera: false });
       setStatus("idle");
-      const detail = String(err?.message || err?.code || "Could not start the chat.");
-      if (detail.includes("Permission") || detail.includes("NotAllowed")) {
-        setError(
-          "Camera/microphone permission was denied. Allow access and try again."
-        );
-      } else {
-        setError(detail);
-      }
+      // Generic, friendly message — no internals leaked to the user.
+      setError("Sorry, something bad just happened. Try again after a moment.");
     }
   }, [ensureAnonymousAuth, ensureCamera, createPeer, joinCall, hangUp]);
 
