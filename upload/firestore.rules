@@ -1,0 +1,96 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function sameUser() {
+      return signedIn() && request.resource.data.ownerUid == request.auth.uid;
+    }
+
+    function roomParticipant(data) {
+      return signedIn() && (
+        data.ownerUid == request.auth.uid ||
+        (data.joinedUid is string && data.joinedUid == request.auth.uid)
+      );
+    }
+
+    function candidateParticipant(data) {
+      return signedIn() && (
+        data.ownerUid == request.auth.uid ||
+        data.roomOwnerUid == request.auth.uid
+      );
+    }
+
+    function smallString(value, maxLen) {
+      return value is string && value.size() <= maxLen;
+    }
+
+    function candidateShape() {
+      return sameUser()
+        && request.resource.data.keys().hasAll(['candidate', 'sdpMid', 'sdpMLineIndex', 'usernameFragment', 'ownerUid', 'roomOwnerUid'])
+        && smallString(request.resource.data.candidate, 4096)
+        && smallString(request.resource.data.sdpMid, 32)
+        && (request.resource.data.usernameFragment == null || smallString(request.resource.data.usernameFragment, 128))
+        && smallString(request.resource.data.roomOwnerUid, 128)
+        && request.resource.data.sdpMLineIndex is int
+        && request.resource.data.sdpMLineIndex >= 0;
+    }
+
+    function roomShape() {
+      return sameUser()
+        && request.resource.data.keys().hasAny(['offer', 'answer'])
+        && request.resource.data.keys().hasAll(['available', 'id', 'ownerUid', 'joinedUid'])
+        && request.resource.data.available is bool
+        && request.resource.data.id is string
+        && request.resource.data.id.size() <= 32
+        && (request.resource.data.joinedUid == null || smallString(request.resource.data.joinedUid, 128))
+        && (
+          !('offer' in request.resource.data) || (
+            request.resource.data.offer is map
+            && smallString(request.resource.data.offer.type, 16)
+            && smallString(request.resource.data.offer.sdp, 64 * 1024)
+          )
+        )
+        && (
+          !('answer' in request.resource.data) || (
+            request.resource.data.answer is map
+            && smallString(request.resource.data.answer.type, 16)
+            && smallString(request.resource.data.answer.sdp, 64 * 1024)
+          )
+        );
+    }
+
+    match /{path=**} {
+      allow read: if signedIn();
+
+      allow create: if roomShape() || candidateShape();
+      allow update: if signedIn() && (
+        (
+          resource.data.keys().hasAll(['available', 'id', 'ownerUid', 'joinedUid'])
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.joinedUid == request.auth.uid
+          && request.resource.data.available is bool
+          && request.resource.data.answer is map
+          && resource.data.available == true
+          && resource.data.joinedUid == null
+        )
+        || (
+          resource.data.keys().hasAll(['candidate', 'sdpMid', 'sdpMLineIndex', 'usernameFragment', 'ownerUid', 'roomOwnerUid'])
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.roomOwnerUid == resource.data.roomOwnerUid
+        )
+      );
+
+      allow delete: if signedIn()
+        && resource.data.keys().hasAll(['available', 'id', 'ownerUid', 'joinedUid'])
+        && roomParticipant(resource.data);
+
+      allow delete: if signedIn()
+        && resource.data.keys().hasAll(['candidate', 'sdpMid', 'sdpMLineIndex', 'usernameFragment', 'ownerUid', 'roomOwnerUid'])
+        && candidateParticipant(resource.data);
+    }
+  }
+}
