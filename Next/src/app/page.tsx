@@ -1,0 +1,668 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import {
+  Loader2,
+  MessageCircle,
+  PhoneOff,
+  Play,
+  Send,
+  Shuffle,
+  Signal,
+  UserX,
+  VideoOff,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  useRandomChat,
+  type ChatStatus,
+} from "@/hooks/use-random-chat";
+
+export default function Home() {
+  const chat = useRandomChat();
+  return (
+    <div className="relative h-[100dvh] overflow-hidden bg-zinc-950 text-zinc-100">
+      {/* Ambient background glows */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-70"
+        style={{
+          background:
+            "radial-gradient(60% 50% at 85% -5%, rgba(16,185,129,0.16) 0%, rgba(16,185,129,0) 60%), radial-gradient(50% 50% at 0% 100%, rgba(244,63,94,0.10) 0%, rgba(244,63,94,0) 55%)",
+        }}
+      />
+
+      <DesktopView chat={chat} />
+      <MobileView chat={chat} />
+
+      {/* Shared error modal */}
+      <Dialog
+        open={!!chat.error}
+        onOpenChange={(o) => {
+          if (!o) chat.dismissError();
+        }}
+      >
+        <DialogContent className="border-white/10 bg-zinc-900 text-zinc-100">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-zinc-100">
+              <Signal className="size-4 text-rose-400" />
+              Something went wrong
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              {chat.error}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={chat.dismissError}
+              className="bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+            >
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Shared helpers                                                      */
+/* ------------------------------------------------------------------ */
+
+function statusConfig(status: ChatStatus, channelOpen: boolean) {
+  switch (status) {
+    case "idle":
+      return {
+        label: "Idle",
+        dot: "bg-zinc-500",
+        text: "text-zinc-400",
+        pulse: false,
+      };
+    case "searching":
+      return {
+        label: "Searching",
+        dot: "bg-amber-400",
+        text: "text-amber-300",
+        pulse: true,
+      };
+    case "connected":
+      return {
+        label: channelOpen ? "Connected" : "Connecting",
+        dot: "bg-emerald-400",
+        text: "text-emerald-300",
+        pulse: !channelOpen,
+      };
+    case "peer-left":
+      return {
+        label: "Stranger left",
+        dot: "bg-rose-400",
+        text: "text-rose-300",
+        pulse: false,
+      };
+  }
+}
+
+function StatusPill({
+  status,
+  channelOpen,
+}: {
+  status: ChatStatus;
+  channelOpen: boolean;
+}) {
+  const c = statusConfig(status, channelOpen);
+  return (
+    <div
+      className={`flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium ${c.text}`}
+    >
+      <span className="relative flex size-2">
+        {c.pulse && (
+          <span
+            className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${c.dot}`}
+          />
+        )}
+        <span className={`relative inline-flex size-2 rounded-full ${c.dot}`} />
+      </span>
+      {c.label}
+    </div>
+  );
+}
+
+function RemoteOverlay({
+  status,
+  hasRemote,
+}: {
+  status: ChatStatus;
+  hasRemote: boolean;
+}) {
+  if (status === "connected" && hasRemote) return null;
+
+  let content: React.ReactNode = null;
+
+  if (status === "searching") {
+    content = (
+      <>
+        <Loader2 className="mb-4 size-10 animate-spin text-emerald-400" />
+        <p className="text-lg font-semibold text-zinc-100">
+          Looking for someone to chat with…
+        </p>
+        <p className="mt-1 text-sm text-zinc-500">
+          Hang tight, we’re finding you a match.
+        </p>
+      </>
+    );
+  } else if (status === "peer-left") {
+    content = (
+      <>
+        <UserX className="mb-4 size-12 text-rose-400" />
+        <p className="text-lg font-semibold text-zinc-100">
+          Stranger disconnected
+        </p>
+        <p className="mt-1 text-sm text-zinc-500">
+          Hit <span className="font-medium text-zinc-300">Next</span> to meet
+          someone new.
+        </p>
+      </>
+    );
+  } else if (status === "connected" && !hasRemote) {
+    content = (
+      <>
+        <Loader2 className="mb-4 size-8 animate-spin text-emerald-400" />
+        <p className="text-sm text-zinc-400">Establishing connection…</p>
+      </>
+    );
+  } else {
+    content = (
+      <>
+        <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-white/5 text-zinc-500 ring-1 ring-white/10">
+          <VideoOff className="size-8" />
+        </div>
+        <p className="text-lg font-semibold text-zinc-100">Ready to connect</p>
+        <p className="mt-1 text-sm text-zinc-500">
+          Press <span className="font-medium text-emerald-400">Start</span> to
+          meet someone new.
+        </p>
+      </>
+    );
+  }
+
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-zinc-950/40 px-6 text-center backdrop-blur-[2px]">
+      {content}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Desktop (unchanged sidebar layout)                                  */
+/* ------------------------------------------------------------------ */
+
+function DesktopView({ chat }: { chat: ReturnType<typeof useRandomChat> }) {
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [draft, setDraft] = useState("");
+
+  useEffect(() => {
+    if (localVideoRef.current) localVideoRef.current.srcObject = chat.localStream;
+  }, [chat.localStream]);
+
+  useEffect(() => {
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = chat.remoteStream;
+  }, [chat.remoteStream]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chat.messages]);
+
+  const started = chat.status !== "idle";
+  const canChat = chat.channelOpen && chat.status === "connected";
+
+  // Global desktop shortcuts: Enter = next, Escape = disconnect.
+  // Ignored while typing in the chat input so Enter can send messages.
+  useEffect(() => {
+    if (!started) return;
+    const handler = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      if (e.key === "Enter") {
+        e.preventDefault();
+        chat.nextPerson();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        chat.disconnect();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [started, chat.nextPerson, chat.disconnect]);
+
+  const onSend = () => {
+    if (chat.sendMessage(draft)) setDraft("");
+  };
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      onSend();
+    }
+  };
+
+  return (
+    <div className="relative z-10 hidden h-full min-h-0 lg:flex lg:flex-col">
+      <header className="flex shrink-0 items-center justify-between px-6 py-3">
+        <div className="flex items-center gap-2.5">
+          <img
+            src="/dicecam-logo.svg"
+            alt="DiceCam"
+            className="size-12 rounded-xl"
+          />
+          <div className="leading-tight">
+            <h1 className="text-lg font-semibold tracking-tight">DiceCam</h1>
+            <p className="text-xs text-zinc-500">Random video chat</p>
+          </div>
+        </div>
+        <StatusPill status={chat.status} channelOpen={chat.channelOpen} />
+      </header>
+
+      <main className="relative min-h-0 flex-1 px-6 pb-3">
+        <div className="grid h-full min-h-0 grid-cols-[24rem_1fr] gap-3">
+          <aside className="flex min-h-0 flex-col gap-3">
+            <div className="relative aspect-video w-full shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/70 shadow-lg shadow-black/40">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="absolute inset-0 h-full w-full -scale-x-100 object-cover"
+              />
+              {!chat.localStream && (
+                <div className="absolute inset-0 flex items-center justify-center text-zinc-600">
+                  <VideoOff className="size-6" />
+                </div>
+              )}
+              <span className="absolute left-2 top-2 z-10 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-zinc-200 backdrop-blur">
+                You
+              </span>
+            </div>
+
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/50 shadow-xl shadow-black/30 backdrop-blur">
+              <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-2.5">
+                <div className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                  <MessageCircle className="size-4 text-emerald-400" />
+                  Chat
+                </div>
+                <span
+                  className={`flex items-center gap-1.5 text-xs ${canChat ? "text-emerald-400" : "text-zinc-500"}`}
+                >
+                  <span
+                    className={`size-1.5 rounded-full ${canChat ? "bg-emerald-400" : "bg-zinc-600"}`}
+                  />
+                  {canChat ? "Live" : "Offline"}
+                </span>
+              </div>
+
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                {chat.messages.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center px-4 text-center">
+                    <MessageCircle className="mb-2 size-6 text-zinc-700" />
+                    <p className="text-xs text-zinc-500">
+                      {chat.status === "connected"
+                        ? "Say hi to your match 👋"
+                        : "Messages appear here once you’re connected."}
+                    </p>
+                  </div>
+                ) : (
+                  chat.messages.map((m) => (
+                    <div
+                      key={m.id}
+                      className={`flex ${m.from === "me" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[85%] break-words rounded-2xl px-3 py-1.5 text-sm leading-snug shadow-sm ${
+                          m.from === "me"
+                            ? "rounded-br-sm bg-emerald-500/20 text-emerald-50 ring-1 ring-emerald-500/30"
+                            : "rounded-bl-sm bg-zinc-800/90 text-zinc-100 ring-1 ring-white/10"
+                        }`}
+                      >
+                        {m.text}
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2 border-t border-white/10 p-3">
+                <Input
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder={canChat ? "Type a message…" : "Connect to start chatting"}
+                  disabled={!canChat}
+                  className="min-w-0 flex-1 border-white/10 bg-zinc-950/60 text-zinc-100 placeholder:text-zinc-600 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
+                />
+                <Button
+                  onClick={onSend}
+                  disabled={!canChat || !draft.trim()}
+                  size="icon"
+                  className="size-9 shrink-0 rounded-xl bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+                  aria-label="Send message"
+                >
+                  <Send className="size-4" />
+                </Button>
+              </div>
+            </div>
+          </aside>
+
+          <section className="flex min-h-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/50 shadow-2xl shadow-black/40 backdrop-blur">
+            <div className="relative aspect-video max-h-full w-full max-w-full overflow-hidden rounded-2xl bg-zinc-950/60">
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              <RemoteOverlay status={chat.status} hasRemote={!!chat.remoteStream} />
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <footer className="relative z-10 shrink-0 border-t border-white/10 bg-zinc-950/60 px-6 py-3 backdrop-blur">
+        <div className="mx-auto flex max-w-4xl items-center justify-end gap-3">
+          {!started ? (
+            <Button
+              onClick={chat.start}
+              size="lg"
+              className="h-12 gap-2 rounded-xl bg-emerald-500 px-8 text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+            >
+              <Play className="size-5 fill-current" />
+              Start
+            </Button>
+          ) : (
+            <>
+              <Button
+                onClick={chat.nextPerson}
+                size="lg"
+                className="h-12 gap-2 rounded-xl bg-zinc-100 px-6 text-base font-semibold text-zinc-950 shadow-lg transition hover:bg-white"
+              >
+                <Shuffle className="size-5" />
+                Next Person
+              </Button>
+              <Button
+                onClick={chat.disconnect}
+                size="lg"
+                className="h-12 gap-2 rounded-xl bg-rose-500/90 px-6 text-base font-semibold text-white shadow-lg shadow-rose-500/20 transition hover:bg-rose-500"
+              >
+                <PhoneOff className="size-5" />
+                Disconnect
+              </Button>
+            </>
+          )}
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Mobile (new single-screen layout)                                   */
+/* ------------------------------------------------------------------ */
+
+function MobileView({ chat }: { chat: ReturnType<typeof useRandomChat> }) {
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [draft, setDraft] = useState("");
+  const [composing, setComposing] = useState(false);
+  const [stopArmed, setStopArmed] = useState(false);
+  const [cover, setCover] = useState(true);
+  const [showHint, setShowHint] = useState(true);
+  const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (localVideoRef.current) localVideoRef.current.srcObject = chat.localStream;
+  }, [chat.localStream]);
+
+  useEffect(() => {
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = chat.remoteStream;
+  }, [chat.remoteStream]);
+
+  useEffect(() => {
+    return () => {
+      if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+    };
+  }, []);
+
+  // Brief hint on top of the camera — auto-hide after a few seconds.
+  useEffect(() => {
+    const t = setTimeout(() => setShowHint(false), 5000);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Reset transient UI (compose open, stop-armed) whenever call state changes.
+  const [prevStatus, setPrevStatus] = useState(chat.status);
+  if (chat.status !== prevStatus) {
+    setPrevStatus(chat.status);
+    setComposing(false);
+    setStopArmed(false);
+    // Any pending stop-confirm timer will fire later as a harmless no-op.
+  }
+
+  const started = chat.status !== "idle";
+  const canChat = chat.channelOpen && chat.status === "connected";
+
+  const openCompose = () => {
+    setComposing(true);
+    // Focus next tick so the input is mounted before we focus it (brings up keyboard).
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+  const closeCompose = () => {
+    setComposing(false);
+    inputRef.current?.blur();
+  };
+
+  const handleSend = () => {
+    if (chat.sendMessage(draft)) setDraft("");
+  };
+  const onComposeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSend();
+    } else if (e.key === "Escape") {
+      closeCompose();
+    }
+  };
+
+  const handleStop = () => {
+    if (stopArmed) {
+      if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+      setStopArmed(false);
+      chat.disconnect();
+    } else {
+      setStopArmed(true);
+      stopTimerRef.current = setTimeout(() => setStopArmed(false), 2000);
+    }
+  };
+
+  const recentMessages = chat.messages.slice(-4);
+  const c = statusConfig(chat.status, chat.channelOpen);
+
+  return (
+    <div className="relative z-10 flex h-full min-h-0 flex-col lg:hidden">
+      {/* Remote video stage (fills available space, with a small margin) */}
+      <div className="min-h-0 flex-1 bg-zinc-950 p-2.5">
+        <div
+          className="relative h-full w-full cursor-pointer overflow-hidden rounded-2xl bg-zinc-950"
+          onClick={() => setCover((v) => !v)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setCover((v) => !v);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label="Toggle video zoom"
+        >
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className={`absolute inset-0 h-full w-full ${cover ? "object-cover" : "object-contain"}`}
+          />
+
+          {/* Brief hint on top of the camera */}
+          {showHint && (
+            <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[11px] font-medium text-zinc-200 backdrop-blur">
+              Tap video to toggle zoom
+            </div>
+          )}
+
+          {/* Status chip (top-left) */}
+          <div
+            className={`absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-medium backdrop-blur ${c.text}`}
+          >
+            <span className="relative flex size-1.5">
+              {c.pulse && (
+                <span
+                  className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${c.dot}`}
+                />
+              )}
+              <span className={`relative inline-flex size-1.5 rounded-full ${c.dot}`} />
+            </span>
+            {c.label}
+          </div>
+
+          {/* Local camera PiP (top-right, small) */}
+          <div className="absolute right-3 top-3 z-20 w-24 overflow-hidden rounded-xl border border-white/20 bg-zinc-950/80 shadow-lg sm:w-28">
+            <div className="relative aspect-video w-full">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="absolute inset-0 h-full w-full -scale-x-100 object-cover"
+              />
+              {!chat.localStream && (
+                <div className="absolute inset-0 flex items-center justify-center text-zinc-600">
+                  <VideoOff className="size-4" />
+                </div>
+              )}
+              <span className="absolute left-1 top-1 rounded bg-black/55 px-1 py-0.5 text-[9px] font-medium text-zinc-200 backdrop-blur">
+                You
+              </span>
+            </div>
+          </div>
+
+          {/* Message bubbles overlay (bottom of video) */}
+          {recentMessages.length > 0 && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex flex-col items-start gap-1.5 px-3">
+              {recentMessages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`max-w-[80%] break-words rounded-2xl px-2.5 py-1 text-sm leading-snug shadow-md backdrop-blur-sm ${
+                    m.from === "me"
+                      ? "self-end rounded-br-sm bg-emerald-500/30 text-emerald-50 ring-1 ring-emerald-500/40"
+                      : "self-start rounded-bl-sm bg-zinc-900/80 text-zinc-100 ring-1 ring-white/10"
+                  }`}
+                >
+                  {m.text}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <RemoteOverlay status={chat.status} hasRemote={!!chat.remoteStream} />
+        </div>
+      </div>
+
+      {/* Controls (compose bar takes over while typing) */}
+      <div className="shrink-0 border-t border-white/10 bg-zinc-950/80 backdrop-blur">
+        {composing ? (
+          /* Compose bar: field + send + close, sits right above the keyboard */
+          <div className="flex items-center gap-2 p-3">
+            <button
+              type="button"
+              onClick={closeCompose}
+              aria-label="Close"
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-300 active:scale-95"
+            >
+              <X className="size-5" />
+            </button>
+            <Input
+              ref={inputRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={onComposeKeyDown}
+              placeholder="Type a message…"
+              inputMode="text"
+              autoComplete="off"
+              className="min-w-0 flex-1 border-white/10 bg-zinc-900/80 text-base text-zinc-100 placeholder:text-zinc-600 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
+            />
+            <Button
+              onClick={handleSend}
+              disabled={!draft.trim()}
+              size="icon"
+              className="size-10 shrink-0 rounded-xl bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+              aria-label="Send message"
+            >
+              <Send className="size-4" />
+            </Button>
+          </div>
+        ) : !started ? (
+          <div className="p-3">
+            <Button
+              onClick={chat.start}
+              className="h-12 w-full gap-2 rounded-xl bg-emerald-500 text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+            >
+              <Play className="size-5 fill-current" />
+              Start
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 p-3">
+            <Button
+              onClick={chat.nextPerson}
+              className="h-12 gap-1.5 rounded-xl bg-zinc-100 text-sm font-semibold text-zinc-950 shadow transition hover:bg-white"
+            >
+              <Shuffle className="size-5" />
+              Next
+            </Button>
+
+            <Button
+              onClick={handleStop}
+              className={`h-12 gap-1.5 rounded-xl text-sm font-semibold shadow transition ${
+                stopArmed
+                  ? "animate-pulse bg-rose-500 text-white"
+                  : "border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
+              }`}
+            >
+              <PhoneOff className="size-5" />
+              {stopArmed ? "Confirm?" : "Stop"}
+            </Button>
+
+            <Button
+              onClick={openCompose}
+              disabled={!canChat}
+              className="h-12 gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-40"
+            >
+              <MessageCircle className="size-5" />
+              Message
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
